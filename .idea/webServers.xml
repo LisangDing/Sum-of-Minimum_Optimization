@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="48314fbd-3cd0-4489-a9a0-dfb1e26b1ba4" name="Hera_EM_alg">
+        <fileTransfer rootFolder="/home/lisang" accessType="SFTP" host="128.97.19.165" port="22" sshConfigId="80f3667a-e68f-441d-a908-36836388b300" sshConfig="lisang@128.97.19.165:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+      <webServer id="da7d3c7b-cbfc-4375-b3c4-d93d6f2204e6" name="Gyes_EM_alg">
+        <fileTransfer rootFolder="/home/lisang" accessType="SFTP" host="128.97.19.139" port="22" sshConfigId="d3ebcb9e-a26f-4db4-8cf7-78edfb0f0a29" sshConfig="lisang@128.97.19.139:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

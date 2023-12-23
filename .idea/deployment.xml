@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" serverName="Gyes_EM_alg" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
+    <option name="confirmBeforeUploading" value="false" />
     <serverData>
       <paths name="Briareus">
         <serverdata>
@@ -51,6 +52,13 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="Gyes_EM_alg">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/EM_alg" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="Hera">
         <serverdata>
           <mappings>
@@ -62,6 +70,13 @@
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="Hera_EM_alg">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/EM_alg" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
