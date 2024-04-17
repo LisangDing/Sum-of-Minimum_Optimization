@@ -30,6 +30,12 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
     # Optimizer list corresponding to each network
     optimizers = [torch.optim.Adam(net.parameters(), lr=learning_rate) for net in net_init]
 
+    # save the u_init parameters in the previous step
+    net_init_old = net_init.copy()
+
+    # Initialize u_net as specified
+    u_net = [TwoLayerNet(d, hidden_dim).to(device) for _ in range(K)]
+
     for iter in range(iter_max):
         if iter % 10 == 0:
             print("EM iteration ", iter)
@@ -48,6 +54,8 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
         #     min_loss_class = losses.index(min(losses))
         #     classes[min_loss_class].append(i)
 
+
+
         # Initialize a K x N tensor for storing losses
         losses = torch.zeros(K, N, device=device)
 
@@ -65,7 +73,8 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
             losses[j, :] = pred_loss + reg_loss
 
         # Assign data point to the class with minimum loss
-        min_loss, min_loss_classes = torch.min(losses, dim=0)
+        min_loss, _ = torch.min(losses, dim=0)
+
 
         # compare the current loss and the loss of net_star
         current_loss = torch.sum(min_loss) / N
@@ -74,12 +83,43 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
         if current_loss < loss_net_star:
             return net_init, current_loss, iter
 
+        # Now compute u_losses
+        # Update parameters of u_net based on the specified formula
+        for i in range(K):
+            for param_u, param, param_old in zip(u_net[i].parameters(), net_init[i].parameters(),
+                                                 net_init_old[i].parameters()):
+                param_u.data.copy_((param.data - beta * param_old.data) / (1 - beta))   # 不对 不能这样修改
+
+        # Initialize a K x N tensor for storing losses
+        u_losses = torch.zeros(K, N, device=device)
+
+        for j in range(K):
+            # Compute predictions for all data points with network j
+            y_pred = u_net[j](x).squeeze()
+
+            # Compute prediction loss for all data points
+            pred_loss = 0.5 * (y_pred - y) ** 2
+
+            # Compute regularization loss for network j
+            reg_loss = 0.5 * mu * sum(torch.norm(p, p=2) ** 2 for p in u_net[j].parameters())
+
+            # Add prediction loss and regularization term
+            u_losses[j, :] = pred_loss + reg_loss
+
+        # Assign data point to the class with minimum loss
+        _, u_min_loss_classes = torch.min(u_losses, dim=0)
+
+
+
+
+
+
         # Initialize classes
         classes = [[] for _ in range(K)]
 
         # Populate the classes with data point indices
         for i in range(N):
-            classes[min_loss_classes[i]].append(i)
+            classes[u_min_loss_classes[i]].append(i)
 
         # Maximization Step: Train each network on its assigned class
         for j in range(K):
@@ -99,6 +139,10 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
 
                     # Zero gradients, perform a backward pass, and update the weights.
                     optimizers[j].zero_grad()
+
+                    # save the u_init parameters in the previous step
+                    net_init_old = net_init.copy()
+
                     average_loss.backward()
                     optimizers[j].step()
 

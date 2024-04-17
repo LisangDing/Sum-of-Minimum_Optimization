@@ -250,39 +250,13 @@ def Loss(nets, x, y, mu):
     result = torch.sum(min_values) / N
     return result
 
-# save the results into a txt file
-def write_to_file(filename, text):
-    with open(filename, "a") as file:
-        file.write(text + "\n")
 
-# Get the current date and time
-current_time = datetime.datetime.now()
-formatted_time = current_time.strftime("%Y-%m-%d_%H-%M-%S")
 
-# Create a filename with the date and time
-filename = f"result_{formatted_time}.txt"
-
-# number of failing instances for EM, EMus and EMcs algorithms
-fail_count_EM = 0
-fail_count_EM_us = 0
-fail_count_EM_cs = 0
-
-N_iter_EM = 0
-N_iter_EM_us = 0
-N_iter_EM_cs = 0
-
-train_loss_EM = 0
-train_loss_EM_us = 0
-train_loss_EM_cs = 0
-
-test_loss_EM = 0
-test_loss_EM_us = 0
-test_loss_EM_cs = 0
 
 # hyperparameters for the experiment
 N_trial = 100
-d = 10  # Input dimension
-hidden_dim = 5   # Hidden layer dimension
+d = 5  # Input dimension
+hidden_dim = 3   # Hidden layer dimension
 K = 5 # clusters
 N = 1000 # number of data points
 mu = 0.01  # regularization paramter
@@ -319,16 +293,18 @@ seeding_epochs: {seeding_epochs}
 N_test: {N_test}
 """
 
-write_to_file(filename, hyperparameters)
+print(hyperparameters)
+
 
 # If CUDA is used
 if torch.cuda.is_available():
     torch.cuda.manual_seed(seed_value)
     torch.cuda.manual_seed_all(seed_value)  # For multi-GPU setups
 
+gt_loss = 0
+
 
 for n in range(N_trial):
-    print("start trial ", n)
     # generate the K true solutions
     net_star = [TwoLayerNet(d, hidden_dim).to(device) for _ in range(K)]
     
@@ -373,70 +349,10 @@ for n in range(N_trial):
     # loss on the ground truth networks
     loss_net_star = Loss(net_star, x, y, mu)
 
-    net_init = [TwoLayerNet(d, hidden_dim).to(device) for i in range(K)]  # randomly initialize the nets
-    print("EM algorithm for random Gaussian initialization")
-    nets_EM, loss_EM, iter_EM = EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device)  # nets_EM is the nets trained
-
-    net_init_us = uniform_seeding(x, y, mu, K, d, hidden_dim, epochs=seeding_epochs)
-    print("EM algorithm for uniform seeding initialization")
-    nets_EM_us, loss_EM_us, iter_EM_us = EM_train(x, y, mu, net_init_us, inner_iter, iter_max, loss_net_star, device)
-
-    net_init_cs = careful_seeding(x, y, mu, K, d, hidden_dim, epochs=seeding_epochs)
-    print("EM algorithm for careful seeding initialization")
-    nets_EM_cs, loss_EM_cs, iter_EM_cs = EM_train(x, y, mu, net_init_cs, inner_iter, iter_max, loss_net_star, device)
-
-    # compute the loss of net_star
-    # the loss function for each (x,y) pair is 1/2 * ||f(x,theta)-y||^2 + 1/2 * mu * ||theta||^2
-
-    # cumulate the N_iter
-    N_iter_EM = N_iter_EM + iter_EM
-    N_iter_EM_us = N_iter_EM_us + iter_EM_us
-    N_iter_EM_cs = N_iter_EM_cs + iter_EM_cs
-
-    train_loss_EM = train_loss_EM + Loss(nets_EM, x, y, 0.)
-    train_loss_EM_us = train_loss_EM_us + Loss(nets_EM_us, x, y, 0.)
-    train_loss_EM_cs = train_loss_EM_cs + Loss(nets_EM_cs, x, y, 0.)
-
-    test_loss_EM = test_loss_EM + Loss(nets_EM, x_test, y_test, 0.)
-    test_loss_EM_us = test_loss_EM_us + Loss(nets_EM_us, x_test, y_test, 0.)
-    test_loss_EM_cs = test_loss_EM_cs + Loss(nets_EM_cs, x_test, y_test, 0.)
-
-    if iter_EM == iter_max:
-        fail_count_EM = fail_count_EM + 1
-
-    if iter_EM_us == iter_max:
-        fail_count_EM_us = fail_count_EM_us + 1
-
-    if iter_EM_cs == iter_max:
-        fail_count_EM_cs = fail_count_EM_cs + 1
-
-    # Writing results to the file
-    result_text = f"Trial {n}, Loss_EM: {loss_EM}, Loss_EM_us: {loss_EM_us}, " \
-                  f"Loss_EM_cs: {loss_EM_cs}, Loss_net_star: {loss_net_star}; " \
-                  f"Failing rate, EM: {fail_count_EM/(n+1)}, EM_us: {fail_count_EM_us/(n+1)}, " \
-                  f"EM_cs: {fail_count_EM_cs/(n+1)}; Average iterations, EM: {N_iter_EM/(n+1)}, " \
-                  f"EM_cs: {N_iter_EM_cs/(n+1)}, EM_us: {N_iter_EM_us/(n+1)}"
-    print(result_text)
-    write_to_file(filename, result_text)
+    gt_loss = gt_loss + loss_net_star
 
 
 
-# Write final statistics
-final_stats = f"""
-Failure probability of EM: {fail_count_EM / N_trial}
-Average iterations of EM: {N_iter_EM/N_trial}
-Training loss of EM: {train_loss_EM/N_trial}
-Testing loss of EM: {test_loss_EM/N_trial}
-Failure probability of EM with uniform seeding: {fail_count_EM_us / N_trial}
-Average iterations of EM_us: {N_iter_EM_us/N_trial}
-Training loss of EM_us: {train_loss_EM_us/N_trial}
-Testing loss of EM_us: {test_loss_EM_us/N_trial}
-Failure probability of EM with careful seeding: {fail_count_EM_cs / N_trial}
-Average iterations of EM_cs: {N_iter_EM_cs/N_trial}
-Training loss of EM_cs: {train_loss_EM_cs/N_trial}
-Testing loss of EM_cs: {test_loss_EM_cs/N_trial}
-"""
-print(final_stats)
 
-write_to_file(filename, "Final Statistics:")
-write_to_file(filename, final_stats)
+
+print(gt_loss / N_trial)

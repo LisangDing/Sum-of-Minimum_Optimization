@@ -1,0 +1,14 @@
+
+N_trial: 100
+d: 10
+hidden_dim: 5
+K: 5
+N: 1000
+mu: 0.01
+noise_level: 0.01
+inner_iter: 10
+iter_max: 300
+N_sample: 1
+seeding_epochs: 300
+N_test: 200
+

@@ -23,12 +23,12 @@ class TwoLayerNet(nn.Module):
 
 
 
-def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, learning_rate=1e-3):
+def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, fixed_iter, learning_rate=1e-3):
     N = x.shape[0]  # Number of data points
     K = len(net_init)  # Number of networks
 
     # Optimizer list corresponding to each network
-    optimizers = [torch.optim.Adam(net.parameters(), lr=learning_rate) for net in net_init]
+    optimizers = [torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.) for net in net_init]
 
     for iter in range(iter_max):
         if iter % 10 == 0:
@@ -67,12 +67,15 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
         # Assign data point to the class with minimum loss
         min_loss, min_loss_classes = torch.min(losses, dim=0)
 
-        # compare the current loss and the loss of net_star
-        current_loss = torch.sum(min_loss) / N
+        if fixed_iter:
+            pass
+        else:
+            # compare the current loss and the loss of net_star
+            current_loss = torch.sum(min_loss) / N
 
-        # stop training if the current loss is already smaller than the loss of net_star
-        if current_loss < loss_net_star:
-            return net_init, current_loss, iter
+            # stop training if the current loss is already smaller than the loss of net_star
+            if current_loss < loss_net_star:
+                return net_init, current_loss, iter
 
         # Initialize classes
         classes = [[] for _ in range(K)]
@@ -260,7 +263,7 @@ current_time = datetime.datetime.now()
 formatted_time = current_time.strftime("%Y-%m-%d_%H-%M-%S")
 
 # Create a filename with the date and time
-filename = f"result_{formatted_time}.txt"
+filename = f"result_{formatted_time}_SGD.txt"
 
 # number of failing instances for EM, EMus and EMcs algorithms
 fail_count_EM = 0
@@ -281,7 +284,7 @@ test_loss_EM_cs = 0
 
 # hyperparameters for the experiment
 N_trial = 100
-d = 10  # Input dimension
+d = 7  # Input dimension
 hidden_dim = 5   # Hidden layer dimension
 K = 5 # clusters
 N = 1000 # number of data points
@@ -292,6 +295,7 @@ iter_max = 300
 N_sample = 1 # number of centers sampled each time in careful seeding
 seeding_epochs = 300
 N_test = 200
+fixed_iter = True
 
 
 # Set the seed for generating random numbers
@@ -317,6 +321,7 @@ iter_max: {iter_max}
 N_sample: {N_sample}
 seeding_epochs: {seeding_epochs}
 N_test: {N_test}
+fixed_iter: {fixed_iter}
 """
 
 write_to_file(filename, hyperparameters)
@@ -375,15 +380,17 @@ for n in range(N_trial):
 
     net_init = [TwoLayerNet(d, hidden_dim).to(device) for i in range(K)]  # randomly initialize the nets
     print("EM algorithm for random Gaussian initialization")
-    nets_EM, loss_EM, iter_EM = EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device)  # nets_EM is the nets trained
+    nets_EM, loss_EM, iter_EM = EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, fixed_iter)  # nets_EM is the nets trained
 
     net_init_us = uniform_seeding(x, y, mu, K, d, hidden_dim, epochs=seeding_epochs)
     print("EM algorithm for uniform seeding initialization")
-    nets_EM_us, loss_EM_us, iter_EM_us = EM_train(x, y, mu, net_init_us, inner_iter, iter_max, loss_net_star, device)
+    nets_EM_us, loss_EM_us, iter_EM_us = EM_train(x, y, mu, net_init_us, inner_iter, iter_max, loss_net_star,
+                                                  device, fixed_iter)
 
     net_init_cs = careful_seeding(x, y, mu, K, d, hidden_dim, epochs=seeding_epochs)
     print("EM algorithm for careful seeding initialization")
-    nets_EM_cs, loss_EM_cs, iter_EM_cs = EM_train(x, y, mu, net_init_cs, inner_iter, iter_max, loss_net_star, device)
+    nets_EM_cs, loss_EM_cs, iter_EM_cs = EM_train(x, y, mu, net_init_cs, inner_iter, iter_max, loss_net_star,
+                                                  device, fixed_iter)
 
     # compute the loss of net_star
     # the loss function for each (x,y) pair is 1/2 * ||f(x,theta)-y||^2 + 1/2 * mu * ||theta||^2

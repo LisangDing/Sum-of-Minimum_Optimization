@@ -23,12 +23,26 @@ class TwoLayerNet(nn.Module):
 
 
 
-def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, learning_rate=1e-3):
+def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, fixed_iter,
+             learning_rate=1e-3, beta=0.1):
     N = x.shape[0]  # Number of data points
     K = len(net_init)  # Number of networks
 
     # Optimizer list corresponding to each network
     optimizers = [torch.optim.Adam(net.parameters(), lr=learning_rate) for net in net_init]
+
+    # define momentum
+    momentum_buffers = []
+    for net in net_init:
+        net_buffers = {}
+        for name, param in net.named_parameters():
+            net_buffers[name] = torch.zeros_like(param.data)
+        momentum_buffers.append(net_buffers)
+
+
+
+    # save the u_init parameters in the previous step
+    net_init_old = net_init.copy()
 
     for iter in range(iter_max):
         if iter % 10 == 0:
@@ -48,6 +62,9 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
         #     min_loss_class = losses.index(min(losses))
         #     classes[min_loss_class].append(i)
 
+
+
+        # Compute losses just for statistical purpose
         # Initialize a K x N tensor for storing losses
         losses = torch.zeros(K, N, device=device)
 
@@ -67,12 +84,16 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
         # Assign data point to the class with minimum loss
         min_loss, min_loss_classes = torch.min(losses, dim=0)
 
-        # compare the current loss and the loss of net_star
-        current_loss = torch.sum(min_loss) / N
 
-        # stop training if the current loss is already smaller than the loss of net_star
-        if current_loss < loss_net_star:
-            return net_init, current_loss, iter
+        if fixed_iter:
+            pass
+        else:
+            # compare the current loss and the loss of net_star
+            current_loss = torch.sum(min_loss) / N
+
+            # stop training if the current loss is already smaller than the loss of net_star
+            if current_loss < loss_net_star:
+                return net_init, current_loss, iter
 
         # Initialize classes
         classes = [[] for _ in range(K)]
@@ -100,7 +121,37 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
                     # Zero gradients, perform a backward pass, and update the weights.
                     optimizers[j].zero_grad()
                     average_loss.backward()
-                    optimizers[j].step()
+
+                    net_init_old = net_init.copy()
+
+                    # Manual update of parameters and momentum buffers
+                    with torch.no_grad():
+                        for name, param in net_init[j].named_parameters():
+                            if param.grad is not None:
+                                # Update the parameter using the momentum buffer
+                                param -= learning_rate * momentum_buffers[j][name]
+
+                                # Update the momentum buffer
+                                momentum_buffers[j][name] = beta * momentum_buffers[j][name] + param.grad
+                            else:
+                                # Raise an error if a gradient is missing
+                                raise ValueError(
+                                    f"Gradient for parameter '{name}' in network {j} is None. Ensure backward() was called.")
+            else:
+                optimizers[j].zero_grad()
+
+        for j, net in enumerate(net_init):
+            # momentum_buffers[j] is a dictionary where keys are parameter names
+            # and values are the momentum tensors for those parameters.
+
+            for name, param in net.named_parameters():
+                if param.grad is not None:
+                    # Update the momentum buffer for this parameter
+                    # Note: This assumes momentum_buffers[j][name] has been initialized
+                    momentum_buffers[j][name] = beta * momentum_buffers[j][name] + param.grad
+                else:
+                    raise ValueError(
+                        f"Gradient for parameter '{name}' in network {j} is None. Ensure backward() was called.")
 
 
 
@@ -260,7 +311,7 @@ current_time = datetime.datetime.now()
 formatted_time = current_time.strftime("%Y-%m-%d_%H-%M-%S")
 
 # Create a filename with the date and time
-filename = f"result_{formatted_time}.txt"
+filename = f"result_{formatted_time}_momentum_non_u.txt"
 
 # number of failing instances for EM, EMus and EMcs algorithms
 fail_count_EM = 0
@@ -281,8 +332,8 @@ test_loss_EM_cs = 0
 
 # hyperparameters for the experiment
 N_trial = 100
-d = 10  # Input dimension
-hidden_dim = 5   # Hidden layer dimension
+d = 5  # Input dimension
+hidden_dim = 3   # Hidden layer dimension
 K = 5 # clusters
 N = 1000 # number of data points
 mu = 0.01  # regularization paramter
@@ -292,6 +343,8 @@ iter_max = 300
 N_sample = 1 # number of centers sampled each time in careful seeding
 seeding_epochs = 300
 N_test = 200
+beta = 0.1
+fixed_iter = True
 
 
 # Set the seed for generating random numbers
@@ -317,6 +370,8 @@ iter_max: {iter_max}
 N_sample: {N_sample}
 seeding_epochs: {seeding_epochs}
 N_test: {N_test}
+beta: {beta}
+fixed_iter: {fixed_iter}
 """
 
 write_to_file(filename, hyperparameters)
@@ -375,15 +430,18 @@ for n in range(N_trial):
 
     net_init = [TwoLayerNet(d, hidden_dim).to(device) for i in range(K)]  # randomly initialize the nets
     print("EM algorithm for random Gaussian initialization")
-    nets_EM, loss_EM, iter_EM = EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device)  # nets_EM is the nets trained
+    nets_EM, loss_EM, iter_EM = EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device,
+                                         fixed_iter, beta=beta)  # nets_EM is the nets trained
 
     net_init_us = uniform_seeding(x, y, mu, K, d, hidden_dim, epochs=seeding_epochs)
     print("EM algorithm for uniform seeding initialization")
-    nets_EM_us, loss_EM_us, iter_EM_us = EM_train(x, y, mu, net_init_us, inner_iter, iter_max, loss_net_star, device)
+    nets_EM_us, loss_EM_us, iter_EM_us = EM_train(x, y, mu, net_init_us, inner_iter, iter_max, loss_net_star,
+                                                  device, fixed_iter, beta=beta)
 
     net_init_cs = careful_seeding(x, y, mu, K, d, hidden_dim, epochs=seeding_epochs)
     print("EM algorithm for careful seeding initialization")
-    nets_EM_cs, loss_EM_cs, iter_EM_cs = EM_train(x, y, mu, net_init_cs, inner_iter, iter_max, loss_net_star, device)
+    nets_EM_cs, loss_EM_cs, iter_EM_cs = EM_train(x, y, mu, net_init_cs, inner_iter, iter_max, loss_net_star,
+                                                  device, fixed_iter, beta=beta)
 
     # compute the loss of net_star
     # the loss function for each (x,y) pair is 1/2 * ||f(x,theta)-y||^2 + 1/2 * mu * ||theta||^2

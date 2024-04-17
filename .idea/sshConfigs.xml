@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig authType="PASSWORD" host="omadahome.ddns.net" id="a6e8faca-5316-4622-87dc-83905d81470d" port="2222" customName="Hera2" nameFormat="CUSTOM" username="lisang" useOpenSSHConfig="true">
+        <option name="customName" value="Hera2" />
+      </sshConfig>
+    </configs>
+  </component>
+</project>

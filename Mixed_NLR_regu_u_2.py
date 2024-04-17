@@ -67,12 +67,6 @@ def EM_train(x, y, mu, net_init, inner_iter, iter_max, loss_net_star, device, le
         # Assign data point to the class with minimum loss
         min_loss, min_loss_classes = torch.min(losses, dim=0)
 
-        # compare the current loss and the loss of net_star
-        current_loss = torch.sum(min_loss) / N
-
-        # stop training if the current loss is already smaller than the loss of net_star
-        if current_loss < loss_net_star:
-            return net_init, current_loss, iter
 
         # Initialize classes
         classes = [[] for _ in range(K)]
@@ -288,7 +282,7 @@ N = 1000 # number of data points
 mu = 0.01  # regularization paramter
 noise_level = 1e-2
 inner_iter = 10  # inner iteration number seeking for an approximate class minima
-iter_max = 300
+iter_max = 15
 N_sample = 1 # number of centers sampled each time in careful seeding
 seeding_epochs = 300
 N_test = 200
