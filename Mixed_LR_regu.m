@@ -8,6 +8,10 @@ rng(42);
 fail_count_EM = 0;
 fail_count_EMus = 0;
 fail_count_EMcs = 0;
+% the gap between the final result and the optimal solution
+gap_EM = 0;
+gap_EMus = 0;
+gap_EMcs = 0;
 % number of total iterations
 N_iter_EM = 0;
 N_iter_EMus = 0;
@@ -59,14 +63,17 @@ for n = 1:N_trial
 
     if loss_EM(length(loss_EM)) > loss_xstar
         fail_count_EM = fail_count_EM + 1;
+        gap_EM = gap_EM + loss_EM(length(loss_EM)) - loss_xstar;
     end
     
     if loss_EMus(length(loss_EMus)) > loss_xstar
         fail_count_EMus = fail_count_EMus + 1;
+        gap_EMus = gap_EMus + loss_EMus(length(loss_EMus)) - loss_xstar;
     end
 
     if loss_EMcs(length(loss_EMcs)) > loss_xstar
         fail_count_EMcs = fail_count_EMcs + 1;
+        gap_EMcs = gap_EMcs + loss_EMcs(length(loss_EMcs)) - loss_xstar;
     end
 end
 
@@ -149,7 +156,8 @@ function [x, loss] = EM(a, b, mu, x0, iter_max)
         min_loc_old = min_loc;
         for k = 1:K
             if ~isempty(min_loc(min_loc == k))
-                x(:,k) = (a(min_loc==k,:)' * a(min_loc==k,:) + mu * eye(d)) \ (a(min_loc==k,:)' * b(min_loc==k));
+                x(:,k) = (a(min_loc==k,:)' * a(min_loc==k,:) + sum(min_loc == k) * ...
+                    mu * eye(d)) \ (a(min_loc==k,:)' * b(min_loc==k));
             end
         end
         iter = iter + 1;
